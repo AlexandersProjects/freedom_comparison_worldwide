@@ -1,0 +1,357 @@
+---
+title: "Freedom"
+output: html_notebook
+---
+```{r}
+freedom <- read.csv("F:/Alfatraining/Statistik mit R/ANOVA/df_gdp_dem.csv")
+View(freedom)
+```
+
+# 1)	Hypothese 
+H1: Es gibt einen Mittelwertsunterschied zwischen dem Freiheitsstatus und dem relativen GDP.
+
+$$FS_{F} \neq FS_{NF} \neq FS_{PF} \text { für min. einen Vergleich}$$
+
+H0: Es gibt keinen Mittelwertsunterschied zwischen dem Freiheitsstatus und dem relativen GDP.
+
+$$FS_{F}=FS_{NF}=FS_{PF}$$
+# 2)	Voraussetzungen der einfaktoriellen Varianzanalyse ohne Messwiederholung
+✓ Die abhängige Variable ist intervallskaliert -> Ausdauer ist metrisch
+
+✓ Die unabhängige Variable (Faktor) ist kategorial (nominal- oder ordinalskaliert) -> Die Trainingsarten sind nominal-skaliert.
+
+✓ Die durch den Faktor gebildeten Gruppen sind unabhängig Jeder TeilnehmerIn hat ausschliesslich in seiner oder ihrer Gruppe trainiert.
+
+✓ Die abhängige Variablen ist normalverteilt innerhalb jeder der Gruppen (Ab > 25 Probanden pro Gruppe sind Verletzungen in der Regel unproblematisch) -> siehe Histogramm
+
+✓ Homogenität der Varianzen: Die Gruppen stammen aus Grundgesamtheiten mit annähernd identischen Varianzen der abhängigen Variablen -> siehe Levene-Test
+
+```{r}
+library(psych)
+describe(freedom)
+```
+Das relGDP weist starke Unterschiede zwischen mean und median auf.
+# 3)	Boxplots
+```{r}
+library(dbplyr)
+library(ggplot2)
+
+freedom %>% 
+ggplot(aes(y = relGDP, x = Status, 
+fill = Status)) + 
+stat_boxplot(geom = "errorbar",
+width = 0.1) + 
+geom_boxplot()
+```
+Die Daten haben einige Ausreißer.
+
+# 4)	Normalverteilung
+## Histogram
+
+```{r}
+library(tidyverse)
+freedom %>%
+  group_by(Status) %>%
+  ggplot(aes(relGDP, color=Status)) + 
+  geom_histogram(aes(fill = Status), bins = 10) +
+  facet_wrap(~Status) +
+  theme_grey()+
+  labs(x= "Freiheitsstatus",y = "Relatives GDP" )
+```
+```{r}
+sqrt(120)
+```
+
+## QQplot
+```{r}
+library(car)
+
+qqPlot(relGDP ~ Status, data=freedom, 
+       layout=c(1, 4))
+```
+Die Daten sind annähernd normalverteilt, haben aber einige Ausreißer.
+
+
+# 5)	Prüfung der Varianzhomogenität (Levene-Test)
+```{r}
+leveneTest(freedom$relGDP ~ freedom$Status, center="median")
+```
+Wegen der starken Unterschiede zwischen mean und median in GDP wird der median benutzt.
+
+Zum Vergleich wurde der mean auch ausgegeben:
+```{r}
+leveneTest(freedom$relGDP ~ freedom$Status, center="mean")
+```
+Im vorliegenden Beispiel ist der Levene-Test signifikant(F(2,118) = 20.777, p = 6.695e-05), so dass von Varianzhetrogenität ausgegangen werden kann. Das heisst - es muss eine Welch-Korrektur durchgeführt werden.
+
+# 6)	Deskriptive Statistiken
+Die Tabelle in Abbildung gibt die Mittelwerte, Standardabweichungen und Grössen aller drei Gruppen wieder. Diese Informationen werden für die Berichterstattung verwendet.
+
+```{r}
+freedom %>%
+group_by(Status) %>%
+  summarize(Anzahl = n(), Mittelwert = mean(relGDP), Median = median(relGDP), Standardabweichung = sd(relGDP)) %>%
+  mutate_if(is.numeric, round, 2)
+```
+Es gibt einen Mittelwertsunterschied zwischen den Gruppen. Frei (M = 27841401	, SD = 26632852, N = 56) zeigt das höchste relative GDP, gefolgt von nicht frei (M = 12368148, SD = 18508685,N = 21) und teilweise frei (M = 6202767	, SD = 10345156, N=44).
+
+# 7)	Ergebnisse der einfaktoriellen Varianzanalyse
+## mit Welch-Korrektur
+```{r}
+ANOVAmitWelch <- oneway.test(freedom$relGDP ~ freedom$Status)
+ANOVAmitWelch
+```
+Das Gesamtmodel ist signifikant geworden (F(2, 49.062) = 15.491 , p = 6.097e-06). Allerdings lässt sich aufgrund dieses Tests nicht bestimmen, welche der drei Gruppen sich signifikant voneinander unterscheiden. Es ist denkbar, dass sich lediglich ein Paar signifikant unterscheidet und zwischen den übrigen keine signifikanten Unterschiede vorliegen. Daher wird ein Post-hoc-Test durchgeführt.
+
+## ohne Welch-Korrektur für die Effektstärke
+```{r}
+ANOVA <- aov(data=freedom, freedom$relGDP~freedom$Status)
+summary(ANOVA)
+```
+
+# 8)	Post-hoc-Tests
+## Tukey
+```{r}
+TukeyHSD(aov(data=freedom, freedom$relGDP ~ freedom$Status))
+```
+Es wird ersichtlich, dass sich der Freiheitsstatus Frei bezüglich des relativen GDP signifikant unterscheiden (p < .05). Nur teilweise-frei und Nicht-frei sind nicht signifikant unterschiedlich. Dies wird unterstützt vom Boxplot.
+
+Es können also zwei unabhängige/ generalisierbare Gruppen von Freiheitsstatus gebildet werden.
+
++ Frei
++ Nicht-frei und teilweise-frei
+
+## Bonferroni
+```{r}
+pairwise.t.test( x = freedom$relGDP, 
+g = freedom$Status, 
+p.adjust.method = "bonferroni",
+paired = FALSE,
+alternative = "two.sided")
+```
+Dies wird vom Bonferroni-Test bestätigt.
+
+# 9)	Plot der Mittelwerte / Profildiagramm
+```{r}
+ggplot(freedom, aes(x=Status, y=relGDP, group=1))+
+  stat_summary(fun.y = mean, geom="point", size=3)+
+  stat_summary(fun.y = mean, geom="line")+
+  stat_summary(fun.data = mean_cl_normal, geom="errorbar",width=.2, size=.25)+
+  labs(x="Freiheitsstatus", y="Relatives GDP")+
+  theme_classic()
+```
+# 10) Berechnung der Effektstärke
+```{r}
+library(sjstats)
+eta <- eta_sq(ANOVA, partial = TRUE)
+eta
+```
+```{r}
+eff <- sqrt(eta$partial.etasq /(1-eta$partial.etasq))
+eff
+```
+Es wird 19.4 % der Variation in Verträglichkeit durch den Musikstil erklärt wird.
+
+Um zu beurteilen, wie gross dieser Effekt ist, kann man sich an der Einteilung von Cohen (1988) orientieren:
+$$
+\begin{align}
+\text{Schwacher Effekt: } 0.10 &< ||f|| < 0.25             \\
+\text{Schwacher bis mittlerer Effekt: } 0.25 &= ||f||      \\
+\text{Mittlerer Effekt: } 0.25 &< ||f|| < 0.40             \\
+\text{Mittlerer bis starker Effekt: }0.40 &= ||f||         \\
+\text{Starker Effekt: } 0.40 &< ||f||        
+\end{align}
+$$
+Damit entspricht eine Effektstärke von 0.4907143 einem starken Effekt.
+
+# Aussage
+## ANOVA
+Der Freiheitsstatus hat einen signifikanten Einfluss auf das relative GDP (F(2, 49.062) = 15.491 , p = 6.097e-06). 49.1 % der Variation im relativen GDP um den Gesamtmittelwert kann durch den Freiheitsstatus erklärt werden. Die Effektstärke nach Cohen (1988) liegt bei f = 0.4907 und entspricht einem starken Effekt.
+
+## Post-hoc-Test
+Post-hoc-Tests mit Tukey zeigen, dass sich zwei Gruppen von Freiheitsstatus bilden lassen (alle p < .05): Frei (M = 27841401	, SD = 26632852, N = 56) und der Status  Nicht-frei(M = 12368148, SD = 18508685,N = 21) und teilweise-frei (M = 6202767	, SD = 10345156, N=44) bilden die zweite Gruppe.
+
+Damit kann festgehalten, werden, dass zwei unabhängige Gruppen gebildet werden und sich signifikant unterscheiden. Freiheit ist am effektivsten. H0 wird abgelehnt, H1 angenommen.
+
+
+
+# Im Vergleich testen:
+```{r}
+library(tidyverse)
+#interessant könnten auch die gdppc (GDP per capita) conversion 
+freedom$gdppc <- freedom$relGDP / 1000
+```
+
+```{r}
+
+#und die logarithmierte gdppc conversion
+freedom$log_gdppc <- log(freedom$gdppc)
+#sein
+```
+
+```{r}
+describe(freedom)
+```
+
+```{r}
+freedom %>% 
+ggplot(aes(y = gdppc, x = Status, 
+fill = Status)) + 
+stat_boxplot(geom = "errorbar",
+width = 0.1) + 
+geom_boxplot()
+```
+
+```{r}
+freedom %>% 
+ggplot(aes(y = log_gdppc, x = Status, 
+fill = Status)) + 
+stat_boxplot(geom = "errorbar",
+width = 0.1) + 
+geom_boxplot()
+```
+# Normalverteilung logarithmus
+```{r}
+library(tidyverse)
+freedom %>%
+  group_by(Status) %>%
+  ggplot(aes(log_gdppc, color=Status)) + 
+  geom_histogram(aes(fill = Status), bins = 10) +
+  facet_wrap(~Status) +
+  theme_grey()+
+  labs(x= "Freiheitsstatus",y = "Relatives GDP logarithmisiert" )
+```
+## QQplot
+```{r}
+library(car)
+
+qqPlot(log_gdppc ~ Status, data=freedom, 
+       layout=c(1, 4))
+```
+Die Daten sind annähernd normalverteilt, haben aber einige Ausreißer.
+
+
+# 5)	Prüfung der Varianzhomogenität (Levene-Test)
+```{r}
+leveneTest(freedom$log_gdppc ~ freedom$Status, center="median")
+```
+Wegen der starken Unterschiede zwischen mean und median in GDP wird der median benutzt.
+
+Im vorliegenden Beispiel ist der Levene-Test nicht signifikant(F(2,118) = 20.777, p = 6.695e-05), so dass von Varianzhomogenität ausgegangen werden kann. Das heisst - es muss keine Welch-Korrektur durchgeführt werden.
+
+#	Deskriptive Statistiken
+Die Tabelle in Abbildung gibt die Mittelwerte, Standardabweichungen und Grössen aller drei Gruppen wieder. Diese Informationen werden für die Berichterstattung verwendet.
+
+```{r}
+freedom %>%
+group_by(Status) %>%
+  summarize(Anzahl = n(), Mittelwert = mean(log_gdppc), Median = median(log_gdppc), Standardabweichung = sd(log_gdppc)) %>%
+  mutate_if(is.numeric, round, 2)
+```
+Es gibt einen Mittelwertsunterschied zwischen den Gruppen. Frei (M = 9.71	, SD = 1.13, N = 56) zeigt das höchste relative GDP, gefolgt von nicht frei (M = 8.43	, SD = 1.57,N = 21) und teilweise frei (M = 7.95	, SD = 1.25, N=44).
+
+#	Ergebnisse der einfaktoriellen Varianzanalyse
+
+## ohne Welch-Korrektur 
+```{r}
+ANOVA <- aov(data=freedom, freedom$log_gdppc~freedom$Status)
+summary(ANOVA)
+```
+Das Gesamtmodel ist signifikant geworden (F(2, 118) = 25.41  , p = 6.63e-10 ). Allerdings lässt sich aufgrund dieses Tests nicht bestimmen, welche der drei Gruppen sich signifikant voneinander unterscheiden. Es ist denkbar, dass sich lediglich ein Paar signifikant unterscheidet und zwischen den übrigen keine signifikanten Unterschiede vorliegen. Daher wird ein Post-hoc-Test durchgeführt.
+
+#	Post-hoc-Tests
+## Tukey
+```{r}
+TukeyHSD(aov(data=freedom, freedom$log_gdppc ~ freedom$Status))
+```
+Es wird ersichtlich, dass sich der Freiheitsstatus Frei bezüglich des relativen GDP signifikant unterscheiden (p < .05). Nur teilweise-frei und Nicht-frei sind nicht signifikant unterschiedlich. Dies wird unterstützt vom Boxplot.
+
+Es können also zwei unabhängige/ generalisierbare Gruppen von Freiheitsstatus gebildet werden.
+
++ Frei
++ Nicht-frei und teilweise-frei
+
+## Bonferroni
+```{r}
+pairwise.t.test( x = freedom$log_gdppc, 
+g = freedom$Status, 
+p.adjust.method = "bonferroni",
+paired = FALSE,
+alternative = "two.sided")
+```
+Dies wird vom Bonferroni-Test bestätigt.
+
+```{r}
+pairwise.t.test( x = freedom$gdppc, 
+g = freedom$Status, 
+p.adjust.method = "bonferroni",
+paired = FALSE,
+alternative = "two.sided")
+```
+# 9)	Plot der Mittelwerte / Profildiagramm
+```{r}
+ggplot(freedom, aes(x=Status, y=log_gdppc, group=1))+
+  stat_summary(fun = mean, geom="point", size=3)+
+  stat_summary(fun= mean, geom="line")+
+  stat_summary(fun.data = mean_cl_normal, geom="errorbar",width=.2, size=.25)+
+  labs(x="Freiheitsstatus", y="Relatives GDP logarithmiert")+
+  theme_classic()
+```
+# Berechnung der Effektstärke
+```{r}
+library(sjstats)
+eta <- eta_sq(ANOVA, partial = TRUE)
+eta
+```
+```{r}
+eff <- sqrt(eta$partial.etasq /(1-eta$partial.etasq))
+eff
+```
+Es wird 30.1 % der Variation in Verträglichkeit durch den Musikstil erklärt wird.
+
+Um zu beurteilen, wie gross dieser Effekt ist, kann man sich an der Einteilung von Cohen (1988) orientieren:
+$$
+\begin{align}
+\text{Schwacher Effekt: } 0.10 &< ||f|| < 0.25             \\
+\text{Schwacher bis mittlerer Effekt: } 0.25 &= ||f||      \\
+\text{Mittlerer Effekt: } 0.25 &< ||f|| < 0.40             \\
+\text{Mittlerer bis starker Effekt: }0.40 &= ||f||         \\
+\text{Starker Effekt: } 0.40 &< ||f||        
+\end{align}
+$$
+Damit entspricht eine Effektstärke von 0.4907143 einem starken Effekt.
+
+# Aussage
+## ANOVA
+Der Freiheitsstatus hat einen signifikanten Einfluss auf das relative GDP (F(2, 49.062) = 15.491 , p = 6.097e-06). 49.1 % der Variation im relativen GDP um den Gesamtmittelwert kann durch den Freiheitsstatus erklärt werden. Die Effektstärke nach Cohen (1988) liegt bei f = 0.4907 und entspricht einem starken Effekt.
+
+## Post-hoc-Test
+Post-hoc-Tests mit Tukey zeigen, dass sich zwei Gruppen von Freiheitsstatus bilden lassen (alle p < .05): Frei (M = 27841401	, SD = 26632852, N = 56) und der Status  Nicht-frei(M = 12368148, SD = 18508685,N = 21) und teilweise-frei (M = 6202767	, SD = 10345156, N=44) bilden die zweite Gruppe.
+
+Damit kann festgehalten, werden, dass zwei unabhängige Gruppen gebildet werden und sich signifikant unterscheiden. Freiheit ist am effektivsten. H0 wird abgelehnt, H1 angenommen.
+# Ausreißer löschen in R
+```{r}
+boxplot(freedom$gdppc)
+
+Q <- quantile(freedom$gdppc, probs=c(.25, .75), na.rm = FALSE)
+iqr <- IQR(freedom$gdppc)
+
+up <- Q[2]+1.5*iqr # Upper Range 
+low<- Q[1]-1.5*iqr # Lower Range﻿
+
+eliminated<- subset(freedom, freedom$gdppc > (Q[1] - 1.5*iqr) & freedom$gdppc < (Q[2]+1.5*iqr))
+boxplot(eliminated$gdppc)
+```
+```{r}
+library(dplyr)
+library(ggplot2)
+eliminated %>% 
+ggplot(aes(y = gdppc, x = Status, 
+fill = Status)) + 
+stat_boxplot(geom = "errorbar",
+width = 0.1) + 
+geom_boxplot()
+```
+
+
+
