@@ -166,7 +166,7 @@ Damit entspricht eine Effektstärke von 0.4907143 einem starken Effekt.
 
 # Aussage
 ## ANOVA
-Der Freiheitsstatus hat einen signifikanten Einfluss auf das relative GDP (F(2, 49.062) = 15.491 , p = 6.097e-06). 49.1 % der Variation im relativen GDP um den Gesamtmittelwert kann durch den Freiheitsstatus erklärt werden. Die Effektstärke nach Cohen (1988) liegt bei f = 0.4907 und entspricht einem starken Effekt.
+Der Freiheitsstatus hat einen signifikanten Einfluss auf das relative GDP (F(2, 49.062) = 15.491 , p = 6.097e-06). 19.4 % der Variation im relativen GDP um den Gesamtmittelwert kann durch den Freiheitsstatus erklärt werden. Die Effektstärke nach Cohen (1988) liegt bei f = 0.4907 und entspricht einem starken Effekt.
 
 ## Post-hoc-Test
 Post-hoc-Tests mit Tukey zeigen, dass sich zwei Gruppen von Freiheitsstatus bilden lassen (alle p < .05): Frei (M = 27841401	, SD = 26632852, N = 56) und der Status  Nicht-frei(M = 12368148, SD = 18508685,N = 21) und teilweise-frei (M = 6202767	, SD = 10345156, N=44) bilden die zweite Gruppe.
@@ -329,6 +329,7 @@ Der Freiheitsstatus hat einen signifikanten Einfluss auf das relative GDP (F(2, 
 Post-hoc-Tests mit Tukey zeigen, dass sich zwei Gruppen von Freiheitsstatus bilden lassen (alle p < .05): Frei (M = 27841401	, SD = 26632852, N = 56) und der Status  Nicht-frei(M = 12368148, SD = 18508685,N = 21) und teilweise-frei (M = 6202767	, SD = 10345156, N=44) bilden die zweite Gruppe.
 
 Damit kann festgehalten, werden, dass zwei unabhängige Gruppen gebildet werden und sich signifikant unterscheiden. Freiheit ist am effektivsten. H0 wird abgelehnt, H1 angenommen.
+
 # Ausreißer löschen in R
 ```{r}
 boxplot(freedom$gdppc)
